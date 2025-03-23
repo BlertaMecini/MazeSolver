@@ -8,27 +8,27 @@ Maze Solver is a Python-based application that allows users to interact with maz
 
 The goal of this project is to implement an interactive maze solver that demonstrates the A* algorithm efficiently. The application should:
 
-Allow users to select predefined mazes or create their own.
+* Allow users to select predefined mazes or create their own.
 
-Visualize the solving process dynamically.
+* Visualize the solving process dynamically.
 
-Measure and display the solving speed.
+* Measure and display the solving speed.
 
-Provide an interactive, game-like experience for users.
+* Provide an interactive, game-like experience for users.
 
 ## Features
 
-Predefined Mazes: Choose from different levels (easy, medium, hard).
+* Predefined Mazes: Choose from different levels (easy, medium, hard).
 
-Custom Maze Creation: Draw your own maze by placing walls, start, and goal points.
+* Custom Maze Creation: Draw your own maze by placing walls, start, and goal points.
 
-A* Algorithm Implementation: Find the shortest path efficiently.
+* A* Algorithm Implementation: Find the shortest path efficiently.
 
-Real-time Visualization: See the algorithm solving the maze step by step.
+* Real-time Visualization: See the algorithm solving the maze step by step.
 
-Performance Metrics: Display solving speed and step count.
+* Performance Metrics: Display solving speed and step count.
 
-User Controls: Start, pause, reset the solver.
+* User Controls: Start, pause, reset the solver.
 
 ## Refined Design
 
@@ -76,23 +76,23 @@ O(n), where n is the number of nodes stored in memory.
 
 Ensure you have the following installed:
 
-Python 3.7+
+* Python 3.7+
 
-Pygame (for visualization)
+* Pygame (for visualization)
 
-pip install pygame
+`pip install pygame`
 
 ## How to Run the App
 
 Clone the Repository:
 
-git clone https://github.com/BlertaMecini/MazeSolver.git
+`git clone https://github.com/BlertaMecini/MazeSolver.git`
 
-cd MazeSolver
+`cd MazeSolver`
 
 Run the Python Script:
 
-python maze_solver.py
+`python maze_solver.py`
 
 ## Controls
 

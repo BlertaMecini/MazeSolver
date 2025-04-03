@@ -22,19 +22,19 @@ MENU_TOP = (180, 220, 255)   # Top color for menu gradient
 MENU_BOTTOM = (80, 120, 180) # Bottom color for menu gradient
 
 # Set window and cell dimensions
-CELL_SIZE = 16
-WINDOW_WIDTH = 1000
-WINDOW_HEIGHT = 800
-screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption("Maze Solver")
+CELL_SIZE = 16               # Size of each maze cell in pixels
+WINDOW_WIDTH = 1000          # Window width in pixels
+WINDOW_HEIGHT = 800          # Window height in pixels
+screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))  # Create display window
+pygame.display.set_caption("Maze Solver")  # Set window title
 
 # Fonts for different UI elements
-font = pygame.font.SysFont("Arial", 32, bold=True)
-title_font = pygame.font.SysFont("Arial", 48, bold=True)
-alert_font = pygame.font.SysFont("Arial", 60, bold=True)
-close_font = pygame.font.SysFont("Arial", 28, bold=True)
+font = pygame.font.SysFont("Arial", 32, bold=True)      # For buttons and metrics
+title_font = pygame.font.SysFont("Arial", 48, bold=True)  # For titles
+alert_font = pygame.font.SysFont("Arial", 60, bold=True)  # For alert messages
+close_font = pygame.font.SysFont("Arial", 28, bold=True)  # For alert dismiss "X"
 
-# Maze difficulty options with base sizes
+# Maze difficulty options with base sizes (rows, cols)
 DIFFICULTIES = {
     "Easy": (10, 10),
     "Medium": (20, 20),
@@ -42,12 +42,14 @@ DIFFICULTIES = {
 }
 
 class Button:
+    # A reusable button class for UI interaction
     def __init__(self, x, y, width, height, text, action, font=font):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.text = font.render(text, True, WHITE)
-        self.action = action
+        self.rect = pygame.Rect(x, y, width, height)  # Button's bounding box
+        self.text = font.render(text, True, WHITE)    # Rendered text for button
+        self.action = action                          # Function to call on click
 
     def draw(self, screen):
+        # Draw button with shadow, hover effect, and outline
         mouse = pygame.mouse.get_pos()
         hover = self.rect.collidepoint(mouse)
         pygame.draw.rect(screen, SHADOW, self.rect.move(5, 5), border_radius=15)
@@ -59,24 +61,26 @@ class Button:
         screen.blit(self.text, self.text.get_rect(center=self.rect.center))
 
     def handle_click(self, pos):
+        # Trigger action if button is clicked
         if self.rect.collidepoint(pos):
             self.action()
 
 class MazeGame:
+    # Main game class managing state, maze, and UI
     def __init__(self):
-        self.state = "menu"
-        self.difficulty = None
-        self.maze = None
-        self.start = None
-        self.end = None
-        self.path = []
-        self.visited = set()
-        self.iterations = 0
-        self.time = 0
-        self.alert_message = None
-        self.alert_color = BLACK
-        self.alert_start_time = None
-        # Menu buttons
+        self.state = "menu"          # Current state: menu, playing, solving, solved
+        self.difficulty = None       # Selected difficulty level
+        self.maze = None             # 2D grid: 1 = wall, 0 = path
+        self.start = None            # Start position (row, col)
+        self.end = None              # End position (row, col)
+        self.path = []               # List of coordinates for solved path
+        self.visited = set()         # Set of visited cells during solving
+        self.iterations = 0          # Count of A* steps
+        self.time = 0                # Time taken to solve maze
+        self.alert_message = None    # Message for alert (e.g., "Maze Solved!")
+        self.alert_color = BLACK     # Color of alert text
+        self.alert_start_time = None # Timestamp for alert animation
+        # Menu buttons for difficulty selection
         btn_w = 220
         btn_h = 60
         start_y = (WINDOW_HEIGHT - (len(DIFFICULTIES) * (btn_h + 20) - 20)) // 2
@@ -86,11 +90,11 @@ class MazeGame:
             y = start_y + i * (btn_h + 20)
             action = lambda lvl=level, r=rows, c=cols: self.set_difficulty(lvl, r, c)
             self.menu_buttons.append(Button(x, y, btn_w, btn_h, level, action))
-        # Playing and solved state buttons
-        self.play_buttons = []
-        self.solved_buttons = []
+        self.play_buttons = []       # Buttons for "playing" state
+        self.solved_buttons = []     # Buttons for "solved" state
 
     def set_difficulty(self, level, rows, cols):
+        # Set difficulty, generate maze, and switch to playing state
         self.difficulty = level
         self.generate_maze(rows, cols)
         self.state = "playing"
@@ -103,6 +107,7 @@ class MazeGame:
         self.solved_buttons = []
 
     def start_solving(self):
+        # Start A* solving process and animate it
         self.state = "solving"
         self.path = []
         self.visited = set()
@@ -113,7 +118,7 @@ class MazeGame:
             self.iterations += 1
             self.draw()
             pygame.display.flip()
-            pygame.time.wait(10)
+            pygame.time.wait(10)  # Small delay to make solving visible
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -131,6 +136,7 @@ class MazeGame:
         ]
 
     def back_to_menu(self):
+        # Reset game to menu state
         self.state = "menu"
         self.maze = None
         self.difficulty = None
@@ -140,6 +146,7 @@ class MazeGame:
         self.alert_start_time = None
 
     def restart(self):
+        # Regenerate maze and return to playing state
         self.generate_maze(len(self.maze), len(self.maze[0]))
         self.state = "playing"
         self.path = []
@@ -157,42 +164,49 @@ class MazeGame:
         self.solved_buttons = []
 
     def heuristic(self, a, b):
+        # Manhattan distance heuristic for A*: estimates cost between two points
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     def a_star(self):
-        queue = [(0, self.start)]
-        g_score = {self.start: 0}
-        f_score = {self.start: self.heuristic(self.start, self.end)}
-        came_from = {}
+        # A* algorithm: finds shortest path from start to end using a heuristic
+        # Uses a priority queue to explore cells with lowest f_score (g + h)
+        queue = [(0, self.start)]  # Queue of (f_score, position) tuples
+        g_score = {self.start: 0}  # Cost from start to each cell
+        f_score = {self.start: self.heuristic(self.start, self.end)}  # Estimated total cost
+        came_from = {}  # Tracks parent of each cell for path reconstruction
 
-        while queue:
-            current = heapq.heappop(queue)[1]
-            if current == self.end:
+        while queue:  # Loop until queue is empty or goal is found
+            current = heapq.heappop(queue)[1]  # Get cell with lowest f_score
+            if current == self.end:  # If end is reached, build and return path
                 path = []
                 while current in came_from:
                     path.append(current)
                     current = came_from[current]
                 path.append(self.start)
-                self.path = path[::-1]
+                self.path = path[::-1]  # Reverse path to go from start to end
                 return
 
-            self.visited.add(current)
-            yield
+            self.visited.add(current)  # Mark cell as explored
+            yield  # Yield to allow step-by-step visualization
 
+            # Check all four adjacent cells (right, down, left, up)
             for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
                 neighbor = (current[0] + dx, current[1] + dy)
+                # Validate neighbor: in bounds, not a wall, not visited
                 if (0 <= neighbor[0] < len(self.maze) and 
                     0 <= neighbor[1] < len(self.maze[0]) and 
                     self.maze[neighbor[0]][neighbor[1]] == 0 and 
                     neighbor not in self.visited):
-                    tentative_g = g_score[current] + 1
+                    tentative_g = g_score[current] + 1  # Cost to move is 1
+                    # If this is a new or cheaper path, update scores
                     if neighbor not in g_score or tentative_g < g_score[neighbor]:
-                        came_from[neighbor] = current
-                        g_score[neighbor] = tentative_g
-                        f_score[neighbor] = tentative_g + self.heuristic(neighbor, self.end)
-                        heapq.heappush(queue, (f_score[neighbor], neighbor))
+                        came_from[neighbor] = current  # Record parent
+                        g_score[neighbor] = tentative_g  # Update cost so far
+                        f_score[neighbor] = tentative_g + self.heuristic(neighbor, self.end)  # Update total cost
+                        heapq.heappush(queue, (f_score[neighbor], neighbor))  # Add to queue
 
     def draw(self):
+        # Render the current game state
         if self.state == "menu":
             self.draw_menu()
         else:
@@ -201,6 +215,7 @@ class MazeGame:
             self.draw_alert()
 
     def draw_menu(self):
+        # Draw menu with gradient background and difficulty buttons
         for y in range(WINDOW_HEIGHT):
             t = y / WINDOW_HEIGHT
             r = int(MENU_TOP[0] * (1 - t) + MENU_BOTTOM[0] * t)
@@ -215,10 +230,11 @@ class MazeGame:
             button.draw(screen)
 
     def draw_maze(self):
+        # Draw maze grid, title, metrics, and buttons based on state
         maze_w = len(self.maze[0]) * CELL_SIZE
         maze_h = len(self.maze) * CELL_SIZE
-        off_x = (WINDOW_WIDTH - maze_w) // 2
-        off_y = (WINDOW_HEIGHT - maze_h - 150) // 2 + 100
+        off_x = (WINDOW_WIDTH - maze_w) // 2  # Center maze horizontally
+        off_y = (WINDOW_HEIGHT - maze_h - 150) // 2 + 100  # Center with space for title
 
         if self.difficulty:
             title = title_font.render(f"{self.difficulty} Maze", True, BLACK)
@@ -230,20 +246,21 @@ class MazeGame:
                 screen.blit(time_text, (WINDOW_WIDTH // 2 - time_text.get_width() // 2, 40 + title_h))
                 screen.blit(iter_text, (WINDOW_WIDTH // 2 - iter_text.get_width() // 2, 80 + title_h))
 
+        # Render each cell with appropriate color
         for i in range(len(self.maze)):
             for j in range(len(self.maze[0])):
                 if self.maze[i][j] == 1:
-                    color = BLACK
+                    color = BLACK  # Wall
                 elif (i, j) == self.start:
-                    color = GREEN
+                    color = GREEN  # Start point
                 elif (i, j) == self.end:
-                    color = RED
+                    color = RED    # End point
                 elif (i, j) in self.path:
-                    color = YELLOW
+                    color = YELLOW  # Solved path
                 elif (i, j) in self.visited:
-                    color = BLUE
+                    color = BLUE    # Visited during solving
                 else:
-                    color = WHITE
+                    color = WHITE   # Open path
                 pygame.draw.rect(screen, color, (off_x + j * CELL_SIZE, off_y + i * CELL_SIZE, CELL_SIZE, CELL_SIZE))
                 pygame.draw.rect(screen, GRAY, (off_x + j * CELL_SIZE, off_y + i * CELL_SIZE, CELL_SIZE, CELL_SIZE), 1)
 
@@ -256,6 +273,7 @@ class MazeGame:
                 button.draw(screen)
 
     def draw_alert(self):
+        # Draw alert message with pulsing effect and dismiss button
         if self.alert_message:
             alert_text = alert_font.render(self.alert_message, True, self.alert_color)
             alert_rect = alert_text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
@@ -307,58 +325,64 @@ class MazeGame:
                 self.alert_start_time = None
 
     def generate_maze(self, rows, cols):
-        if rows % 2 == 0: rows += 1
-        if cols % 2 == 0: cols += 1
-        maze = [[1 for _ in range(cols)] for _ in range(rows)]
-        visited = set()
+        # Generate a random maze using recursive backtracking (DFS algorithm)
+        if rows % 2 == 0: rows += 1  # Ensure odd rows for proper wall/path structure
+        if cols % 2 == 0: cols += 1  # Ensure odd cols for proper wall/path structure
+        maze = [[1 for _ in range(cols)] for _ in range(rows)]  # Initialize grid with walls (1)
+        visited = set()  # Track cells visited during DFS
 
         def carve(x, y):
-            maze[x][y] = 0
-            visited.add((x, y))
-            dirs = [(0, 2), (2, 0), (0, -2), (-2, 0)]
-            random.shuffle(dirs)
+            # Recursive DFS to carve paths through the maze
+            maze[x][y] = 0  # Mark current cell as a path
+            visited.add((x, y))  # Add to visited set
+            dirs = [(0, 2), (2, 0), (0, -2), (-2, 0)]  # Directions: right, down, left, up (step by 2)
+            random.shuffle(dirs)  # Randomize directions for maze variety
             for dx, dy in dirs:
                 new_x = x + dx
                 new_y = y + dy
+                # Check if new position is valid and unvisited
                 if (0 <= new_x < rows and 0 <= new_y < cols and 
                     (new_x, new_y) not in visited):
-                    maze[x + dx//2][y + dy//2] = 0
-                    carve(new_x, new_y)
+                    maze[x + dx//2][y + dy//2] = 0  # Carve wall between current and new cell
+                    carve(new_x, new_y)  # Recursively carve from new position
 
-        maze[1][1] = 0
-        carve(1, 1)
+        maze[1][1] = 0  # Start carving from an inner cell
+        carve(1, 1)  # Begin DFS maze generation
         
-        maze[0][0] = 0
-        maze[rows-1][cols-1] = 0
+        maze[0][0] = 0  # Ensure start position is open
+        maze[rows-1][cols-1] = 0  # Ensure end position is open
+        # Ensure start is connected if surrounded by walls
         if maze[0][1] == 1 and maze[1][0] == 1:
-            maze[0][1] = 0
+            maze[0][1] = 0  # Open a path to the right
         end_x = rows-1
         end_y = cols-1
+        # Ensure end is connected if not reached by DFS
         if (end_x, end_y) not in visited:
             if end_x > 1 and maze[end_x-1][end_y] == 0:
-                maze[end_x-2][end_y] = 0
+                maze[end_x-2][end_y] = 0  # Connect from above
             elif end_y > 1 and maze[end_x][end_y-1] == 0:
-                maze[end_x][end_y-2] = 0
+                maze[end_x][end_y-2] = 0  # Connect from left
             else:
-                maze[rows-2][cols-1] = 0
+                maze[rows-2][cols-1] = 0  # Fallback: open vertical path
                 maze[rows-3][cols-1] = 0
 
+        # Add extra paths to increase maze complexity
         walls = []
         for i in range(rows):
             for j in range(cols):
                 if maze[i][j] == 1:
-                    walls.append((i, j))
-        random.shuffle(walls)
-        extra = int((rows * cols) * 0.1)
+                    walls.append((i, j))  # Collect all wall positions
+        random.shuffle(walls)  # Shuffle for random extra paths
+        extra = int((rows * cols) * 0.1)  # Target 10% of cells for extra paths
         for i in range(min(extra, len(walls))):
             x, y = walls[i]
-            neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+            neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]  # Check four neighbors
             open_count = 0
             for nx, ny in neighbors:
                 if 0 <= nx < rows and 0 <= ny < cols and maze[nx][ny] == 0:
-                    open_count += 1
+                    open_count += 1  # Count adjacent open paths
             if open_count >= 2:
-                maze[x][y] = 0
+                maze[x][y] = 0  # Remove wall if it connects multiple paths
 
         self.maze = maze
         self.start = (0, 0)
@@ -367,6 +391,7 @@ class MazeGame:
         self.visited = set()
 
 def main():
+    # Main loop: initialize game and handle events
     game = MazeGame()
     clock = pygame.time.Clock()
 
@@ -389,7 +414,7 @@ def main():
 
         game.draw()
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(60)  # Cap frame rate at 60 FPS
 
 if __name__ == "__main__":
     main()

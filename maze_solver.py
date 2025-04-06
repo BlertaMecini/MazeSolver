@@ -4,9 +4,6 @@ import heapq
 import time
 import math
 
-# Start Pygame to manage graphics and user input
-pygame.init()
-
 # Define colors with RGB values for visual consistency
 WHITE = (255, 255, 255)      # Background and open paths
 BLACK = (0, 0, 0)            # Walls and text
@@ -25,14 +22,6 @@ MENU_BOTTOM = (80, 120, 180) # Bottom color for menu gradient
 CELL_SIZE = 16               # Size of each maze cell in pixels
 WINDOW_WIDTH = 1000          # Window width in pixels
 WINDOW_HEIGHT = 800          # Window height in pixels
-screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))  # Create display window
-pygame.display.set_caption("Maze Solver")  # Set window title
-
-# Fonts for different UI elements
-font = pygame.font.SysFont("Arial", 32, bold=True)      # For buttons and metrics
-title_font = pygame.font.SysFont("Arial", 48, bold=True)  # For titles
-alert_font = pygame.font.SysFont("Arial", 60, bold=True)  # For alert messages
-close_font = pygame.font.SysFont("Arial", 28, bold=True)  # For alert dismiss "X"
 
 # Maze difficulty options with base sizes (rows, cols)
 DIFFICULTIES = {
@@ -43,9 +32,9 @@ DIFFICULTIES = {
 
 class Button:
     # A reusable button class for UI interaction
-    def __init__(self, x, y, width, height, text, action, font=font):
+    def __init__(self, x, y, width, height, text, action, font=None):
         self.rect = pygame.Rect(x, y, width, height)  # Button's bounding box
-        self.text = font.render(text, True, WHITE)    # Rendered text for button
+        self.text = font.render(text, True, WHITE) if font else text   # Rendered text for button
         self.action = action                          # Function to call on click
 
     def draw(self, screen):
@@ -81,28 +70,20 @@ class MazeGame:
         self.alert_color = BLACK     # Color of alert text
         self.alert_start_time = None # Timestamp for alert animation
         # Menu buttons for difficulty selection
-        btn_w = 220
-        btn_h = 60
-        start_y = (WINDOW_HEIGHT - (len(DIFFICULTIES) * (btn_h + 20) - 20)) // 2
         self.menu_buttons = []
-        for i, (level, (rows, cols)) in enumerate(DIFFICULTIES.items()):
-            x = WINDOW_WIDTH // 2 - btn_w // 2
-            y = start_y + i * (btn_h + 20)
-            action = lambda lvl=level, r=rows, c=cols: self.set_difficulty(lvl, r, c)
-            self.menu_buttons.append(Button(x, y, btn_w, btn_h, level, action))
         self.play_buttons = []       # Buttons for "playing" state
         self.solved_buttons = []     # Buttons for "solved" state
 
-    def set_difficulty(self, level, rows, cols):
+    def set_difficulty(self, level, rows, cols, extra_wall_percent=0.1):
         # Set difficulty, generate maze, and switch to playing state
         self.difficulty = level
-        self.generate_maze(rows, cols)
+        self.generate_maze(rows, cols, extra_wall_percent)
         self.state = "playing"
         btn_w = 140
         btn_h = 50
         self.play_buttons = [
-            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 80, btn_w, btn_h, "Start", self.start_solving),
-            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 140, btn_w, btn_h, "Back", self.back_to_menu)
+            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 80, btn_w, btn_h, "Start", self.start_solving, font),
+            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 140, btn_w, btn_h, "Back", self.back_to_menu, font)
         ]
         self.solved_buttons = []
 
@@ -131,8 +112,8 @@ class MazeGame:
         btn_w = 140
         btn_h = 50
         self.solved_buttons = [
-            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 80, btn_w, btn_h, "Restart", self.restart),
-            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 140, btn_w, btn_h, "Back", self.back_to_menu)
+            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 80, btn_w, btn_h, "Restart", self.restart, font),
+            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 140, btn_w, btn_h, "Back", self.back_to_menu, font)
         ]
 
     def back_to_menu(self):
@@ -158,8 +139,8 @@ class MazeGame:
         btn_w = 140
         btn_h = 50
         self.play_buttons = [
-            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 80, btn_w, btn_h, "Start", self.start_solving),
-            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 140, btn_w, btn_h, "Back", self.back_to_menu)
+            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 80, btn_w, btn_h, "Start", self.start_solving, font),
+            Button(WINDOW_WIDTH - 180, WINDOW_HEIGHT - 140, btn_w, btn_h, "Back", self.back_to_menu, font)
         ]
         self.solved_buttons = []
 
@@ -324,75 +305,113 @@ class MazeGame:
                 self.alert_message = None
                 self.alert_start_time = None
 
-    def generate_maze(self, rows, cols):
-        # Generate a random maze using recursive backtracking (DFS algorithm)
-        if rows % 2 == 0: rows += 1  # Ensure odd rows for proper wall/path structure
-        if cols % 2 == 0: cols += 1  # Ensure odd cols for proper wall/path structure
-        maze = [[1 for _ in range(cols)] for _ in range(rows)]  # Initialize grid with walls (1)
-        visited = set()  # Track cells visited during DFS
+    def generate_maze(self, rows, cols, extra_wall_percent=0.1):
+        if rows % 2 == 0: rows += 1
+        if cols % 2 == 0: cols += 1
+        maze = [[1 for _ in range(cols)] for _ in range(rows)]
+        visited = set()
+        stack = [(1, 1)]
 
-        def carve(x, y):
-            # Recursive DFS to carve paths through the maze
-            maze[x][y] = 0  # Mark current cell as a path
-            visited.add((x, y))  # Add to visited set
-            dirs = [(0, 2), (2, 0), (0, -2), (-2, 0)]  # Directions: right, down, left, up (step by 2)
-            random.shuffle(dirs)  # Randomize directions for maze variety
+        # Iterative DFS to create a perfect maze
+        while stack:
+            x, y = stack[-1]  # Peek at top of stack (don’t pop yet)
+            maze[x][y] = 0
+            visited.add((x, y))
+            dirs = [(0, 2), (2, 0), (0, -2), (-2, 0)]
+            random.shuffle(dirs)
+            unvisited_neighbors = False
             for dx, dy in dirs:
                 new_x = x + dx
                 new_y = y + dy
-                # Check if new position is valid and unvisited
                 if (0 <= new_x < rows and 0 <= new_y < cols and 
                     (new_x, new_y) not in visited):
-                    maze[x + dx//2][y + dy//2] = 0  # Carve wall between current and new cell
-                    carve(new_x, new_y)  # Recursively carve from new position
+                    maze[x + dx//2][y + dy//2] = 0
+                    stack.append((new_x, new_y))
+                    unvisited_neighbors = True
+                    break  # Move to next cell immediately
+            if not unvisited_neighbors:
+                stack.pop()  # Backtrack if no unvisited neighbors
 
-        maze[1][1] = 0  # Start carving from an inner cell
-        carve(1, 1)  # Begin DFS maze generation
-        
-        maze[0][0] = 0  # Ensure start position is open
-        maze[rows-1][cols-1] = 0  # Ensure end position is open
-        # Ensure start is connected if surrounded by walls
+        # Ensure start and end are connected
+        maze[0][0] = 0
+        maze[rows-1][cols-1] = 0
         if maze[0][1] == 1 and maze[1][0] == 1:
-            maze[0][1] = 0  # Open a path to the right
+            maze[0][1] = 0
         end_x = rows-1
         end_y = cols-1
-        # Ensure end is connected if not reached by DFS
         if (end_x, end_y) not in visited:
             if end_x > 1 and maze[end_x-1][end_y] == 0:
-                maze[end_x-2][end_y] = 0  # Connect from above
+                maze[end_x-2][end_y] = 0
             elif end_y > 1 and maze[end_x][end_y-1] == 0:
-                maze[end_x][end_y-2] = 0  # Connect from left
+                maze[end_x][end_y-2] = 0
             else:
-                maze[rows-2][cols-1] = 0  # Fallback: open vertical path
-                maze[rows-3][cols-1] = 0
+                maze[rows-2][cols-1] = 0
 
-        # Add extra paths to increase maze complexity
-        walls = []
-        for i in range(rows):
-            for j in range(cols):
-                if maze[i][j] == 1:
-                    walls.append((i, j))  # Collect all wall positions
-        random.shuffle(walls)  # Shuffle for random extra paths
-        extra = int((rows * cols) * 0.1)  # Target 10% of cells for extra paths
+        # Controlled extra wall removal (scaled for maze size)
+        walls = [(i, j) for i in range(rows) for j in range(cols) if maze[i][j] == 1]
+        random.shuffle(walls)
+        # Cap extra walls removed to maintain maze structure
+        extra = min(int((rows * cols) * extra_wall_percent), len(walls) // 2)
         for i in range(min(extra, len(walls))):
             x, y = walls[i]
-            neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]  # Check four neighbors
-            open_count = 0
-            for nx, ny in neighbors:
-                if 0 <= nx < rows and 0 <= ny < cols and maze[nx][ny] == 0:
-                    open_count += 1  # Count adjacent open paths
-            if open_count >= 2:
-                maze[x][y] = 0  # Remove wall if it connects multiple paths
+            neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+            open_count = sum(1 for nx, ny in neighbors if 0 <= nx < rows and 0 <= ny < cols and maze[nx][ny] == 0)
+            if open_count == 2:  # Only remove if it connects exactly two paths (avoids over-opening)
+                maze[x][y] = 0
 
         self.maze = maze
         self.start = (0, 0)
         self.end = (rows-1, cols-1)
         self.path = []
-        self.visited = set()
+        self.visited = set()       
+
+    def check_solvable(self):
+        # Simple DFS to check if a path exists from start to end
+        visited = set()
+        stack = [self.start]
+        while stack:
+            current = stack.pop()
+            if current == self.end:
+                return True
+            if current not in visited:
+                visited.add(current)
+                for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                    neighbor = (current[0] + dx, current[1] + dy)
+                    if (0 <= neighbor[0] < len(self.maze) and 
+                        0 <= neighbor[1] < len(self.maze[0]) and 
+                        self.maze[neighbor[0]][neighbor[1]] == 0 and 
+                        neighbor not in visited):
+                        stack.append(neighbor)
+        return False 
 
 def main():
+
+    # Start Pygame to manage graphics and user input
+    pygame.init()
+
+    global font, title_font, alert_font, close_font, screen
+    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))  # Create display window
+    pygame.display.set_caption("Maze Solver")  # Set window title
+
+    # Fonts for different UI elements
+    font = pygame.font.SysFont("Arial", 32, bold=True)      # For buttons and metrics
+    title_font = pygame.font.SysFont("Arial", 48, bold=True)  # For titles
+    alert_font = pygame.font.SysFont("Arial", 60, bold=True)  # For alert messages
+    close_font = pygame.font.SysFont("Arial", 28, bold=True)  # For alert dismiss "X"
+
     # Main loop: initialize game and handle events
     game = MazeGame()
+
+    btn_w = 220
+    btn_h = 60
+    start_y = (WINDOW_HEIGHT - (len(DIFFICULTIES) * (btn_h + 20) - 20)) // 2
+    game.menu_buttons = []
+    for i, (level, (rows, cols)) in enumerate(DIFFICULTIES.items()):
+        x = WINDOW_WIDTH // 2 - btn_w // 2
+        y = start_y + i * (btn_h + 20)
+        action = lambda lvl=level, r=rows, c=cols: game.set_difficulty(lvl, r, c)
+        game.menu_buttons.append(Button(x, y, btn_w, btn_h, level, action, font))
+
     clock = pygame.time.Clock()
 
     while True:

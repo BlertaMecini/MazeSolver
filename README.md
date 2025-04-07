@@ -61,6 +61,10 @@ cd MazeSolver
 ```bash
 python maze_solver.py
 ```
+**3. For tests run the script:**
+```bash
+python test_maze_solver.py
+```
 **3. Interact:**
 - **Menu:** Click "Easy," "Medium," or "Hard."
 - **Playing:** Click "Start" to solve, "Back" to menu.
